@@ -1,0 +1,2 @@
+package-sideload-create /usr/sbin
+skeleton/* /usr/share/package-sideload/skeleton/

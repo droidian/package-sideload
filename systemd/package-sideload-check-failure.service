@@ -1,0 +1,15 @@
+# This service checks for /var/cache/package-sideload/failed-features
+# and, if it does exist, imports the failed features inside an environment
+# variable.
+
+[Unit]
+Description=package-sideload: boot-time check for failed features
+ConditionPathExists=/var/cache/package-sideload/failed-features
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c "/usr/bin/systemctl set-environment PACKAGE_SIDELOAD_FAILED=\"`/usr/bin/tr \"\n\" \" \" < /var/cache/package-sideload/failed-features`\""
+ExecStart=/bin/rm -f /var/cache/package-sideload/failed-features
+
+[Install]
+WantedBy=multi-user.target

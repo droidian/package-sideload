@@ -1,0 +1,30 @@
+Source: package-sideload
+Maintainer: Eugenio Paolantonio (g7) <me@medesimo.eu>
+Section: misc
+Priority: optional
+Build-Depends: debhelper (>= 10)
+Standards-Version: 4.5.0.3
+Vcs-Browser: https://github.com/hybris-mobian/package-sideload
+Vcs-Git: https://github.com/hybris-mobian/package-sideload.git
+
+Package: package-sideload
+Architecture: all
+Depends: ${misc:Depends},
+         apt,
+         util-linux,
+         coreutils,
+         systemd
+Description: Services to allow installing sideloaded packages
+ This package contains services to allow installing sideloaded packages
+ (from e.g. Android recovery) at runtime.
+
+Package: package-sideload-tools
+Architecture: all
+Depends: ${misc:Depends},
+         apt,
+         tar,
+         zip,
+         coreutils
+Description: Tools to create flashable feature bundles
+ This package contains tools to create flashable feature bundles
+ that can be handled by package-sideload.

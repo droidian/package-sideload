@@ -1,0 +1,14 @@
+[Unit]
+Description=package-sideload: installation of sideloaded packages
+DefaultDependencies=no
+Requires=sysinit.target dbus.socket
+After=sysinit.target dbus.socket systemd-journald.socket system-update-pre.target
+Before=shutdown.target system-update.target
+
+[Service]
+Type=oneshot
+ExecCondition=/bin/sh -c '/bin/test $(/usr/bin/realpath /system-update) == /var/cache/package-sideload'
+ExecStart=/usr/sbin/package-sideload
+StandardOutput=file:/var/log/package-sideload-last.log
+StandardError=file:/var/log/package-sideload-last.log
+FailureAction=reboot

@@ -1,0 +1,139 @@
+#!/bin/bash
+#
+# package-sideload - Allows runtime installation of sideloaded packages
+# Copyright (C) 2021 Eugenio "g7" Paolantonio <me@medesimo.eu>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in the
+#      documentation and/or other materials provided with the distribution.
+#    * Neither the name of the <organization> nor the
+#      names of its contributors may be used to endorse or promote products
+#      derived from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# This script creates a flashable feature bundle that can be used with
+# package-sideload.
+# This script should be run inside the same environment bundles should
+# go to - i.e. during rootfs creation.
+
+set -e
+
+BUNDLE_SKELETON="/usr/share/package-sideload/skeleton"
+
+info() {
+	echo "I: $@"
+}
+
+warning() {
+	echo "W: $@" >&2
+}
+
+error() {
+	echo "E: $@" >&2
+	exit 1
+}
+
+help() {
+	cat <<EOF
+$0 - creates a flashable feature bundle that can be used with package-sideload
+
+USAGE: $0 /path/to/result/file.zip [package1] [package2] .. [packageN]
+
+The feature bundle name is picked up from the target filename.
+EOF
+}
+
+cleanup() {
+	[ -e "${tmpdir}" ] && rm -rf "${tmpdir}"
+}
+
+########################################################################
+
+case "${1}" in
+	"-h"|"--help")
+		help
+		exit 0
+		;;
+	"")
+		error "You should specify a target path and the list of packages to install. Use $0 --help for more details"
+		;;
+	*)
+		[ -n "${2}" ] || error "You haven't specified the packages to download. Use $0 --help for more details"
+
+		target_file="${1}"
+		bundle_name="$(basename ${target_file})"
+		bundle_name="${bundle_name/.zip/}"
+		shift
+		;;
+esac
+
+packages="${@}"
+
+[ -n "${packages}" ] || error "No packages specified! Use $0 --help for more details"
+
+tmpdir="$(mktemp -d)"
+trap cleanup EXIT
+
+info "Creating feature bundle in ${target_file}"
+
+# Download packages
+systemtree="${tmpdir}/system"
+pkgdir="${systemtree}/var/cache/package-sideload/bundles/${bundle_name}"
+
+mkdir -p "${pkgdir}"
+
+info "Downloading packages"
+
+/usr/bin/apt-get \
+	--option "dir::cache=${pkgdir}" \
+	--option "Debug::NoLocking=1" \
+	--assume-yes \
+	--download-only \
+	--reinstall \
+	install \
+	${packages}
+
+# Remove package cache
+rm -f ${pkgdir}/*.bin
+
+# Store package list
+for package in ${packages}; do
+	echo "${package}" >> ${pkgdir}/packages
+done
+
+info "Creating trigger symlink"
+
+# Create trigger symlink to allow booting in the system-update target
+ln -s /var/cache/package-sideload "${systemtree}/system-update"
+
+# Now create the payload archive
+info "Creating payload archive"
+
+tar -C "${systemtree}" -cvf ${tmpdir}/payload.tar ./
+
+info "Preparing feature bundle"
+
+cp -Rav ${BUNDLE_SKELETON}/* ${tmpdir}
+
+# Remove systemtree as it's now inside the payload.tar archive
+rm -rf "${systemtree}"
+
+# Create zip file
+(cd ${tmpdir} ; zip -r "${target_file}" *)
+
+info "Finished, zip file created in ${target_file}"

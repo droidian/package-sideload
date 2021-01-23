@@ -1,0 +1,75 @@
+#!/sbin/sh
+#
+# feature bundle dropper for package-sideload
+#
+
+OUT="/proc/self/fd/${2}"
+ZIP="${3}"
+
+workdir="/tmp/package-sideload-dropper.$$"
+mpoint="${workdir}/mpoint"
+
+ui_print() {
+	echo -e "ui_print ${@}" >> ${OUT}
+}
+
+info() {
+	ui_print "I: ${@}"
+}
+
+warning() {
+	ui_print "W: ${@}"
+}
+
+error() {
+	ui_print "E: ${@}"
+	exit 1
+}
+
+cleanup() {
+	if grep "${mpoint}" /proc/mounts; then
+		info "Umounting rootfs"
+		umount "${mpoint}"
+	fi
+
+	info "Cleanup"
+	rm -f "${workdir}/payload.tar" || true
+	rmdir "${mpoint}" || true
+	rmdir "${workdir}" || true
+
+	exit 0
+}
+
+# Search for the rootfs. hybris-mobian.img has priority over rootfs.img.
+found_image=""
+for image in hybris-mobian.img rootfs.img; do
+	if [ -e /data/${image} ]; then
+		found_image="/data/${image}"
+		break
+	fi
+done
+
+if [ -z "${found_image}" ]; then
+	error "No hybris-mobian image found"
+else
+	info "Found image ${found_image}"
+fi
+
+mkdir -p "${mpoint}"
+
+# Mount rootfs
+info "Mounting rootfs"
+
+mount "${found_image}" "${mpoint}" || error "Unable to mount image"
+
+trap cleanup EXIT
+
+# Extract payload
+info "Extracting payload from zip file"
+
+unzip -o -d "${workdir}" "${ZIP}" "payload.tar" || error "Unable to extract payload"
+
+# Finally untar the payload ontop the roots
+info "Installing payload onto the rootfs"
+
+tar -C "${mpoint}" -xf "${workdir}/payload.tar" || error "Unable to install payload"

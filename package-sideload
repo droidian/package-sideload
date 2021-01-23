@@ -1,0 +1,99 @@
+#!/bin/bash
+#
+# package-sideload - Allows runtime installation of sideloaded packages
+# Copyright (C) 2021 Eugenio "g7" Paolantonio <me@medesimo.eu>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in the
+#      documentation and/or other materials provided with the distribution.
+#    * Neither the name of the <organization> nor the
+#      names of its contributors may be used to endorse or promote products
+#      derived from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# The objective of package-sideload is to allow installation of sideloaded
+# packages, but should not be abused - it's not designed to handle system
+# upgrades but only specific "feature bundles" (development tools,
+# hardware adaptation packages) which are also tied to a specific rootfs
+# version.
+
+PACKAGE_SIDELOAD_CACHE="/var/cache/package-sideload"
+PACKAGE_SIDELOAD_BUNDLES="${PACKAGE_SIDELOAD_CACHE}/bundles"
+PACKAGE_SIDELOAD_FAILURE="${PACKAGE_SIDELOAD_CACHE}/failed-features"
+
+info() {
+	echo "I: $@"
+}
+
+warning() {
+	echo "W: $@" >&2
+}
+
+error() {
+	echo "E: $@" >&2
+	exit 1
+}
+
+feature_failed_to_install() {
+	### Creates ${PACKAGE_SIDELOAD_FAILURE} and appends ${1} there
+	echo "${1}" >> "${PACKAGE_SIDELOAD_FAILURE}"
+	warning "Unable to install feature ${1}"
+}
+
+########################################################################
+
+info "Starting package-sideload run on $(date -R)"
+
+# Clean up ${PACKAGE_SIDELOAD_FAILURE} (note: theoretically it should
+# be cleaned up at the first restart, but better safe than sorry)
+rm -f "${PACKAGE_SIDELOAD_FAILURE}"
+
+for feature_dir in ${PACKAGE_SIDELOAD_BUNDLES}/*; do
+	if [ -e "${feature_dir}/packages" ]; then
+		feature_packages="$(tr '\n' ' ' < ${feature_dir}/packages)"
+	else
+		continue
+	fi
+
+	feature_name=$(basename ${feature_dir})
+
+	info "Installing feature bundle ${feature_name}"
+
+	if [ -n "${feature_packages}" ]; then
+		DEBIAN_FRONTEND=noninteractive \
+		/usr/bin/apt-get \
+			--option "dir::cache=${feature_dir}" \
+			--option "Debug::NoLocking=1" \
+			--assume-yes \
+			install \
+			${feature_packages} \
+		|| feature_failed_to_install "${feature_name}"
+	else
+		warning "No packages have been specified"
+	fi
+
+	info "Cleaning up"
+	rm -rf "${feature_dir}"
+done
+
+info "Run finished on $(date -R)"
+
+# Remove /system-update
+rm -f /system-update
+
+systemctl reboot
