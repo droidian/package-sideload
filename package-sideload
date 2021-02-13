@@ -113,6 +113,7 @@ for feature_dir in ${PACKAGE_SIDELOAD_BUNDLES}/*; do
 			--option "dir::state=${state_dir}" \
 			--option "Debug::NoLocking=1" \
 			--assume-yes \
+			--allow-downgrades \
 			--reinstall \
 			install \
 			${feature_packages} \

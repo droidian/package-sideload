@@ -178,6 +178,7 @@ info "Downloading packages"
 	--option "Debug::NoLocking=1" \
 	--assume-yes \
 	--download-only \
+	--allow-downgrades \
 	--reinstall \
 	install \
 	${packages}
