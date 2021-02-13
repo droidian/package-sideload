@@ -156,6 +156,17 @@ if [ -n "${adaptation_packages}" ]; then
 			cp ${gpg} ${overlay_dir}/trusted.gpg.d/
 		done
 
+		# Handle extra packages we should download and that the adaptation
+		# package conveniently tells us - this is only used by package-sideload-create
+		# and not by our receiver.
+		# This can also be used to "forcibly downgrade" packages, provided
+		# APT pins are in place.
+		for package_list in $(find ${pkg_extract_dir} -wholename '*/package-sideload-create.d/*' -type f); do
+			info "Found extra package list $(basename ${package_list})"
+			packages="${packages} $(tr '\n' ' ' < ${package_list})"
+			cat "${package_list}" >> ${pkgdir}/packages
+		done
+
 		rm -rf "${pkg_extract_dir}"
 	done
 
