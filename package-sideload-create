@@ -137,6 +137,7 @@ if [ -n "${adaptation_packages}" ]; then
 
 		# Handle package lists
 		for repository in $(find ${pkg_extract_dir} -wholename '*/sources.list.d/*.list' -type f); do
+			[ ! -L "${repository}" ] || continue
 			info "Found extra repository description $(basename ${repository})"
 			cp ${repository} ${apt_config_dir}/sources.list.d/
 			cp ${repository} ${overlay_dir}/sources.list.d/
@@ -144,6 +145,7 @@ if [ -n "${adaptation_packages}" ]; then
 
 		# Handle apt pinning preferences
 		for preference in $(find ${pkg_extract_dir} -wholename '*/preferences.d/*' -type f); do
+			[ ! -L "${preference}" ] || continue
 			info "Found extra pinning preference $(basename ${preference})"
 			cp ${preference} ${apt_config_dir}/preferences.d/
 			cp ${preference} ${overlay_dir}/preferences.d/
@@ -151,6 +153,7 @@ if [ -n "${adaptation_packages}" ]; then
 
 		# Handle extra gpg keys
 		for gpg in $(find ${pkg_extract_dir} -wholename '*/trusted.gpg.d/*' -type f); do
+			[ ! -L "${gpg}" ] || continue
 			info "Found extra GPG key $(basename ${gpg})"
 			cp ${gpg} ${apt_config_dir}/trusted.gpg.d/
 			cp ${gpg} ${overlay_dir}/trusted.gpg.d/
@@ -162,6 +165,7 @@ if [ -n "${adaptation_packages}" ]; then
 		# This can also be used to "forcibly downgrade" packages, provided
 		# APT pins are in place.
 		for package_list in $(find ${pkg_extract_dir} -wholename '*/package-sideload-create.d/*' -type f); do
+			[ ! -L "${package_list}" ] || continue
 			info "Found extra package list $(basename ${package_list})"
 			packages="${packages} $(tr '\n' ' ' < ${package_list})"
 			cat "${package_list}" >> ${pkgdir}/packages
