@@ -112,7 +112,11 @@ info "Downloading packages"
 rm -f ${pkgdir}/*.bin
 
 # Store package list
+bootimage_packages=""
 for package in ${packages}; do
+	if [[ ${package} == linux-bootimage-* ]]; then
+		bootimage_packages="${bootimage_packages} ${package}"
+	fi
 	echo "${package}" >> ${pkgdir}/packages
 done
 
@@ -125,6 +129,26 @@ ln -s /var/cache/package-sideload "${systemtree}/system-update"
 info "Creating payload archive"
 
 tar -C "${systemtree}" -cvf ${tmpdir}/payload.tar ./
+
+# Extract kernel if we should
+if [ -n "${bootimage_packages}" ]; then
+	info "Extracting bootimage to allow flashing via recovery"
+
+	pkgextractdir="${tmpdir}/_pkg_extract"
+	for package in ${bootimage_packages}; do
+		mkdir -p "${pkgextractdir}"
+		dpkg-deb -x ${pkgdir}/archives/${package}_*.deb ${pkgextractdir}
+		bootimage=$(find ${pkgextractdir} -iname boot.img* -type f | head -n 1)
+
+		if [ -e "${bootimage}" ]; then
+			info "Bootimage found"
+			mv ${bootimage} ${tmpdir}/boot.img
+		fi
+
+		rm -rf "${pkgextractdir}"
+		[ ! -e ${tmpdir}/boot.img ] || break
+	done
+fi
 
 info "Preparing feature bundle"
 

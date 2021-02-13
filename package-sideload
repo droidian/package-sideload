@@ -80,6 +80,7 @@ for feature_dir in ${PACKAGE_SIDELOAD_BUNDLES}/*; do
 			--option "dir::cache=${feature_dir}" \
 			--option "Debug::NoLocking=1" \
 			--assume-yes \
+			--reinstall \
 			install \
 			${feature_packages} \
 		|| feature_failed_to_install "${feature_name}"

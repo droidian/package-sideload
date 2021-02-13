@@ -67,9 +67,40 @@ trap cleanup EXIT
 # Extract payload
 info "Extracting payload from zip file"
 
-unzip -o -d "${workdir}" "${ZIP}" "payload.tar" || error "Unable to extract payload"
+unzip -o -d "${workdir}" "${ZIP}" || error "Unable to extract payload"
 
 # Finally untar the payload ontop the roots
 info "Installing payload onto the rootfs"
 
 tar -C "${mpoint}" -xf "${workdir}/payload.tar" || error "Unable to install payload"
+
+# If we should flash the kernel, do it
+if [ -e "${workdir}/boot.img" ]; then
+	info "Kernel found, flashing"
+
+	current_slot=$(grep -o 'androidboot\.slot_suffix=_[a-b]' /proc/cmdline)
+	case "${current_slot}" in
+		"androidboot.slot_suffix=_a")
+			target_partition="boot_a"
+			;;
+		"androidboot.slot_suffix=_b")
+			target_partition="boot_b"
+			;;
+		"")
+			# No A/B
+			target_partition="boot"
+			;;
+		*)
+			error "Unknown error while searching for a boot partition, exiting"
+			;;
+	esac
+
+	partition=$(find /dev/block/platform -name ${target_partition} | head -n 1)
+	if [ -n "${partition}" ]; then
+		info "Found boot partition for current slot ${partition}"
+
+		dd if=${workdir}/boot.img of=${partition} || error "Unable to flash kernel"
+
+		info "Kernel flashed"
+	fi
+fi
