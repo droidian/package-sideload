@@ -71,13 +71,46 @@ for feature_dir in ${PACKAGE_SIDELOAD_BUNDLES}/*; do
 	fi
 
 	feature_name=$(basename ${feature_dir})
+	overlay_dir="${feature_dir}/apt-overlay"
+	if [ -d "${feature_dir}/apt-state" ]; then
+		state_dir="${feature_dir}/apt-state"
+	else
+		state_dir="var/lib/apt" # Default
+	fi
 
 	info "Installing feature bundle ${feature_name}"
+
+	# Create a temporary APT configuration directory
+	tmp_dir="$(mktemp -d)"
+	apt_config_dir="${tmp_dir}/apt"
+	cp -R /etc/apt "${apt_config_dir}"
+
+	# Copy APT config from the payload
+	if [ -d "${overlay_dir}" ]; then
+		for repository in $(find ${overlay_dir} -wholename '*/sources.list.d/*.list' -type f); do
+			info "Found extra repository description $(basename ${repository})"
+			cp ${repository} ${apt_config_dir}/sources.list.d/
+		done
+
+		# Handle apt pinning preferences
+		for preference in $(find ${overlay_dir} -wholename '*/preferences.d/*' -type f); do
+			info "Found extra pinning preference $(basename ${preference})"
+			cp ${preference} ${apt_config_dir}/preferences.d/
+		done
+
+		# Handle extra gpg keys
+		for gpg in $(find ${overlay_dir} -wholename '*/trusted.gpg.d/*' -type f); do
+			info "Found extra GPG key $(basename ${gpg})"
+			cp ${gpg} ${apt_config_dir}/trusted.gpg.d/
+		done
+	fi
 
 	if [ -n "${feature_packages}" ]; then
 		DEBIAN_FRONTEND=noninteractive \
 		/usr/bin/apt-get \
+			--option "dir::etc=${apt_config_dir}" \
 			--option "dir::cache=${feature_dir}" \
+			--option "dir::state=${state_dir}" \
 			--option "Debug::NoLocking=1" \
 			--assume-yes \
 			--reinstall \

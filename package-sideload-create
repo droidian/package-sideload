@@ -92,15 +92,91 @@ trap cleanup EXIT
 info "Creating feature bundle in ${target_file}"
 
 # Download packages
+apt_config_dir="${tmpdir}/_apt"
+pkg_extract_dir="${tmpdir}/_pkg_extract"
 systemtree="${tmpdir}/system"
 pkgdir="${systemtree}/var/cache/package-sideload/bundles/${bundle_name}"
+state_dir="${pkgdir}/apt-state"
+overlay_dir="${pkgdir}/apt-overlay"
 
-mkdir -p "${pkgdir}"
+cp -R /etc/apt "${apt_config_dir}"
+mkdir -p "${state_dir}"
+mkdir -p "${overlay_dir}"
+
+# Store package list
+bootimage_packages=""
+for package in ${packages}; do
+	if [[ ${package} == linux-bootimage-* ]]; then
+		bootimage_packages="${bootimage_packages} ${package}"
+	elif [[ ${package} == adaptation-* ]]; then
+		# If an adaptation package has been specified, download it
+		# first and hunt for custom repositories and pinning rules.
+		# This allows to properly handle custom repositories and pinning
+		# rules so that they can be honoured during the feature bundle
+		# installation.
+		adaptation_packages="${adaptation_packages} ${package}"
+	fi
+	echo "${package}" >> ${pkgdir}/packages
+done
+
+info "Preparing APT configuration"
+
+for dir in sources.list.d preferences.d trusted.gpg.d; do
+	mkdir -p ${apt_config_dir}/${dir}
+	mkdir -p ${overlay_dir}/${dir}
+done
+
+if [ -n "${adaptation_packages}" ]; then
+	# Download using apt-get download
+	adaptation_download_target="${tmpdir}/_adaptation"
+	mkdir -p "${adaptation_download_target}"
+	(cd "${adaptation_download_target}" ; apt-get download ${adaptation_packages})
+
+	for package in ${adaptation_packages}; do
+		# TODO: Move package extraction to a function?
+		mkdir -p "${pkg_extract_dir}"
+		dpkg-deb -x ${adaptation_download_target}/${package}_*.deb ${pkg_extract_dir}
+
+		# Handle package lists
+		for repository in $(find ${pkg_extract_dir} -wholename '*/sources.list.d/*.list' -type f); do
+			info "Found extra repository description $(basename ${repository})"
+			cp ${repository} ${apt_config_dir}/sources.list.d/
+			cp ${repository} ${overlay_dir}/sources.list.d/
+		done
+
+		# Handle apt pinning preferences
+		for preference in $(find ${pkg_extract_dir} -wholename '*/preferences.d/*' -type f); do
+			info "Found extra pinning preference $(basename ${preference})"
+			cp ${preference} ${apt_config_dir}/preferences.d/
+			cp ${preference} ${overlay_dir}/preferences.d/
+		done
+
+		# Handle extra gpg keys
+		for gpg in $(find ${pkg_extract_dir} -wholename '*/trusted.gpg.d/*' -type f); do
+			info "Found extra GPG key $(basename ${gpg})"
+			cp ${gpg} ${apt_config_dir}/trusted.gpg.d/
+			cp ${gpg} ${overlay_dir}/trusted.gpg.d/
+		done
+
+		rm -rf "${pkg_extract_dir}"
+	done
+
+	rm -rf "${adaptation_download_target}"
+fi
 
 info "Downloading packages"
 
 /usr/bin/apt-get \
+	--option "dir::etc=${apt_config_dir}" \
 	--option "dir::cache=${pkgdir}" \
+	--option "dir::state=${state_dir}" \
+	--option "Debug::NoLocking=1" \
+	update
+
+/usr/bin/apt-get \
+	--option "dir::etc=${apt_config_dir}" \
+	--option "dir::cache=${pkgdir}" \
+	--option "dir::state=${state_dir}" \
 	--option "Debug::NoLocking=1" \
 	--assume-yes \
 	--download-only \
@@ -110,15 +186,6 @@ info "Downloading packages"
 
 # Remove package cache
 rm -f ${pkgdir}/*.bin
-
-# Store package list
-bootimage_packages=""
-for package in ${packages}; do
-	if [[ ${package} == linux-bootimage-* ]]; then
-		bootimage_packages="${bootimage_packages} ${package}"
-	fi
-	echo "${package}" >> ${pkgdir}/packages
-done
 
 info "Creating trigger symlink"
 
@@ -134,18 +201,18 @@ tar -C "${systemtree}" -cvf ${tmpdir}/payload.tar ./
 if [ -n "${bootimage_packages}" ]; then
 	info "Extracting bootimage to allow flashing via recovery"
 
-	pkgextractdir="${tmpdir}/_pkg_extract"
 	for package in ${bootimage_packages}; do
-		mkdir -p "${pkgextractdir}"
-		dpkg-deb -x ${pkgdir}/archives/${package}_*.deb ${pkgextractdir}
-		bootimage=$(find ${pkgextractdir} -iname boot.img* -type f | head -n 1)
+		# TODO: Move package extraction to a function?
+		mkdir -p "${pkg_extract_dir}"
+		dpkg-deb -x ${pkgdir}/archives/${package}_*.deb ${pkg_extract_dir}
+		bootimage=$(find ${pkg_extract_dir} -iname boot.img* -type f | head -n 1)
 
 		if [ -e "${bootimage}" ]; then
 			info "Bootimage found"
 			mv ${bootimage} ${tmpdir}/boot.img
 		fi
 
-		rm -rf "${pkgextractdir}"
+		rm -rf "${pkg_extract_dir}"
 		[ ! -e ${tmpdir}/boot.img ] || break
 	done
 fi
@@ -156,6 +223,7 @@ cp -Rav ${BUNDLE_SKELETON}/* ${tmpdir}
 
 # Remove systemtree as it's now inside the payload.tar archive
 rm -rf "${systemtree}"
+rm -rf "${apt_config_dir}"
 
 # Create zip file
 (cd ${tmpdir} ; zip -r "${target_file}" *)
