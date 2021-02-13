@@ -104,11 +104,9 @@ mkdir -p "${state_dir}"
 mkdir -p "${overlay_dir}"
 
 # Store package list
-bootimage_packages=""
+adaptation_packages=""
 for package in ${packages}; do
-	if [[ ${package} == linux-bootimage-* ]]; then
-		bootimage_packages="${bootimage_packages} ${package}"
-	elif [[ ${package} == adaptation-* ]]; then
+	if [[ ${package} == adaptation-* ]]; then
 		# If an adaptation package has been specified, download it
 		# first and hunt for custom repositories and pinning rules.
 		# This allows to properly handle custom repositories and pinning
@@ -198,13 +196,19 @@ info "Creating payload archive"
 tar -C "${systemtree}" -cvf ${tmpdir}/payload.tar ./
 
 # Extract kernel if we should
+bootimage_packages=""
+for package in ${pkgdir}/archives/*.deb; do
+	if [[ $(basename ${package}) == linux-bootimage-*.deb ]]; then
+		bootimage_packages="${bootimage_packages} ${package}"
+	fi
+done
 if [ -n "${bootimage_packages}" ]; then
 	info "Extracting bootimage to allow flashing via recovery"
 
 	for package in ${bootimage_packages}; do
 		# TODO: Move package extraction to a function?
 		mkdir -p "${pkg_extract_dir}"
-		dpkg-deb -x ${pkgdir}/archives/${package}_*.deb ${pkg_extract_dir}
+		dpkg-deb -x ${package} ${pkg_extract_dir}
 		bootimage=$(find ${pkg_extract_dir} -iname boot.img* -type f | head -n 1)
 
 		if [ -e "${bootimage}" ]; then
