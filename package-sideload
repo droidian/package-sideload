@@ -112,6 +112,7 @@ for feature_dir in ${PACKAGE_SIDELOAD_BUNDLES}/*; do
 			--option "dir::cache=${feature_dir}" \
 			--option "dir::state=${state_dir}" \
 			--option "Debug::NoLocking=1" \
+			--option "Dpkg::Options::=--force-confnew" \
 			--assume-yes \
 			--allow-downgrades \
 			--reinstall \
