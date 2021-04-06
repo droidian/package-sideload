@@ -78,17 +78,26 @@ tar -C "${mpoint}" -xf "${workdir}/payload.tar" || error "Unable to install payl
 if [ -e "${workdir}/boot.img" ]; then
 	info "Kernel found, flashing"
 
+	if [ -e "${workdir}/dtbo.img" ]; then
+		has_dtbo="yes"
+	else
+		has_dtbo="no"
+	fi
+
 	current_slot=$(grep -o 'androidboot\.slot_suffix=_[a-b]' /proc/cmdline)
 	case "${current_slot}" in
 		"androidboot.slot_suffix=_a")
 			target_partition="boot_a"
+			target_dtbo_partition="dtbo_a"
 			;;
 		"androidboot.slot_suffix=_b")
 			target_partition="boot_b"
+			target_dtbo_partition="dtbo_b"
 			;;
 		"")
 			# No A/B
 			target_partition="boot"
+			has_dtbo="no"
 			;;
 		*)
 			error "Unknown error while searching for a boot partition, exiting"
@@ -102,5 +111,18 @@ if [ -e "${workdir}/boot.img" ]; then
 		dd if=${workdir}/boot.img of=${partition} || error "Unable to flash kernel"
 
 		info "Kernel flashed"
+	fi
+
+	if [ "${has_dtbo}" = "yes" ]; then
+		info "DTBO found, flashing"
+
+		partition=$(find /dev/block/platform -name ${target_dtbo_partition} | head -n 1)
+		if [ -n "${partition}" ]; then
+			info "Found DTBO partition for current slot ${partition}"
+
+			dd if=${workdir}/dtbo.img of=${partition} || error "Unable to flash DTBO"
+
+			info "DTBo flashed"
+		fi
 	fi
 fi

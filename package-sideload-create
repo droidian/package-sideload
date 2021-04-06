@@ -226,10 +226,16 @@ if [ -n "${bootimage_packages}" ]; then
 		mkdir -p "${pkg_extract_dir}"
 		dpkg-deb -x ${package} ${pkg_extract_dir}
 		bootimage=$(find ${pkg_extract_dir} -iname boot.img* -type f | head -n 1)
+		dtbo=$(find ${pkg_extract_dir} -iname dtbo.img* -type f | head -n 1)
 
 		if [ -e "${bootimage}" ]; then
 			info "Bootimage found"
 			mv ${bootimage} ${tmpdir}/boot.img
+		fi
+
+		if [ -e "${dtbo}" ]; then
+			info "DTBO found"
+			mv ${dtbo} ${tmpdir}/boot.img
 		fi
 
 		rm -rf "${pkg_extract_dir}"
