@@ -84,20 +84,29 @@ if [ -e "${workdir}/boot.img" ]; then
 		has_dtbo="no"
 	fi
 
+	if [ -e "${workdir}/vbmeta.img" ]; then
+		has_vbmeta="yes"
+	else
+		has_vbmeta="no"
+	fi
+
 	current_slot=$(grep -o 'androidboot\.slot_suffix=_[a-b]' /proc/cmdline)
 	case "${current_slot}" in
 		"androidboot.slot_suffix=_a")
 			target_partition="boot_a"
 			target_dtbo_partition="dtbo_a"
+			target_vbmeta_partition="vbmeta_a"
 			;;
 		"androidboot.slot_suffix=_b")
 			target_partition="boot_b"
 			target_dtbo_partition="dtbo_b"
+			target_vbmeta_partition="vbmeta_b"
 			;;
 		"")
 			# No A/B
 			target_partition="boot"
 			has_dtbo="no"
+			has_vbmeta="no"
 			;;
 		*)
 			error "Unknown error while searching for a boot partition, exiting"
@@ -122,7 +131,21 @@ if [ -e "${workdir}/boot.img" ]; then
 
 			dd if=${workdir}/dtbo.img of=${partition} || error "Unable to flash DTBO"
 
-			info "DTBo flashed"
+			info "DTBO flashed"
 		fi
 	fi
+
+	if [ "${has_vbmeta}" = "yes" ]; then
+		info "VBMETA found, flashing"
+
+		partition=$(find /dev/block/platform -name ${target_vbmeta_partition} | head -n 1)
+		if [ -n "${partition}" ]; then
+			info "Found VBMETA partition ${partition}"
+
+			dd if=${workdir}/vbmeta.img of=${partition} || error "Unable to flash VBMETA"
+
+			info "VBMETA flashed"
+		fi
+	fi
+
 fi

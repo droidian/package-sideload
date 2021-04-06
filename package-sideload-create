@@ -227,6 +227,7 @@ if [ -n "${bootimage_packages}" ]; then
 		dpkg-deb -x ${package} ${pkg_extract_dir}
 		bootimage=$(find ${pkg_extract_dir} -iname boot.img* -type f | head -n 1)
 		dtbo=$(find ${pkg_extract_dir} -iname dtbo.img* -type f | head -n 1)
+		vbmeta=$(find ${pkg_extract_dir} -iname vbmeta.img* -type f | head -n 1)
 
 		if [ -e "${bootimage}" ]; then
 			info "Bootimage found"
@@ -236,6 +237,11 @@ if [ -n "${bootimage_packages}" ]; then
 		if [ -e "${dtbo}" ]; then
 			info "DTBO found"
 			mv ${dtbo} ${tmpdir}/boot.img
+		fi
+
+		if [ -e "${vbmeta}" ]; then
+			info "VBMETA found"
+			mv ${vbmeta} ${tmpdir}/boot.img
 		fi
 
 		rm -rf "${pkg_extract_dir}"
