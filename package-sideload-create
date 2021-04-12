@@ -236,12 +236,12 @@ if [ -n "${bootimage_packages}" ]; then
 
 		if [ -e "${dtbo}" ]; then
 			info "DTBO found"
-			mv ${dtbo} ${tmpdir}/boot.img
+			mv ${dtbo} ${tmpdir}/dtbo.img
 		fi
 
 		if [ -e "${vbmeta}" ]; then
 			info "VBMETA found"
-			mv ${vbmeta} ${tmpdir}/boot.img
+			mv ${vbmeta} ${tmpdir}/vbmeta.img
 		fi
 
 		rm -rf "${pkg_extract_dir}"
