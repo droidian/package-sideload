@@ -105,8 +105,8 @@ if [ -e "${workdir}/boot.img" ]; then
 		"")
 			# No A/B
 			target_partition="boot"
-			has_dtbo="no"
-			has_vbmeta="no"
+			target_dtbo_partition="dtbo"
+			target_vbmeta_partition="vbmeta"
 			;;
 		*)
 			error "Unknown error while searching for a boot partition, exiting"
