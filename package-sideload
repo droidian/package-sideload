@@ -36,6 +36,8 @@ PACKAGE_SIDELOAD_CACHE="/var/cache/package-sideload"
 PACKAGE_SIDELOAD_BUNDLES="${PACKAGE_SIDELOAD_CACHE}/bundles"
 PACKAGE_SIDELOAD_FAILURE="${PACKAGE_SIDELOAD_CACHE}/failed-features"
 
+PLYMOUTH="$(which plymouth)"
+
 info() {
 	echo "I: $@"
 }
@@ -49,10 +51,20 @@ error() {
 	exit 1
 }
 
+plymouth_message() {
+	[ -x "${PLYMOUTH}" ] && ${PLYMOUTH} display-message --text="$@" || true
+}
+
 feature_failed_to_install() {
 	### Creates ${PACKAGE_SIDELOAD_FAILURE} and appends ${1} there
 	echo "${1}" >> "${PACKAGE_SIDELOAD_FAILURE}"
 	warning "Unable to install feature ${1}"
+
+	if [ -z "${PLYMOUTH}" ]; then
+		# Do not wait if plymouth is not available
+		plymouth_message "Unable to install feature ${1}"
+		sleep 3
+	fi
 }
 
 ########################################################################
@@ -79,6 +91,7 @@ for feature_dir in ${PACKAGE_SIDELOAD_BUNDLES}/*; do
 	fi
 
 	info "Installing feature bundle ${feature_name}"
+	plymouth_message "Installing bundle ${feature_name}"
 
 	# Create a temporary APT configuration directory
 	tmp_dir="$(mktemp -d)"
@@ -131,5 +144,9 @@ info "Run finished on $(date -R)"
 
 # Remove /system-update
 rm -f /system-update
+
+# We're going to reboot, ensure the user is aware
+plymouth_message "Rebooting"
+sleep 3
 
 systemctl reboot
