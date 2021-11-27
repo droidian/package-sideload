@@ -91,7 +91,7 @@ for feature_dir in ${PACKAGE_SIDELOAD_BUNDLES}/*; do
 	fi
 
 	info "Installing feature bundle ${feature_name}"
-	plymouth_message "Installing bundle ${feature_name}"
+	plymouth_message "Installing bundle $(echo ${feature_name} | cut -d'_' -f1)"
 
 	# Create a temporary APT configuration directory
 	tmp_dir="$(mktemp -d)"
