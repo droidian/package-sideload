@@ -1,6 +1,6 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: package-sideload
-Source: https://github.com/hybris-mobian/package-sideload
+Source: https://github.com/droidian/package-sideload
 
 Files: *
 Copyright: 2021 Eugenio "g7" Paolantonio <me@medesimo.eu>
